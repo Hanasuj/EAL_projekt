@@ -1,0 +1,46 @@
+[project]
+name = "projekt-optimalizace-2026"
+version = "0.1.0"
+description = "Projekt z optimalizace – tým (doplňte)"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "cvxpy>=1.6",
+    "matplotlib>=3.9",
+    "pandas>=2.2",
+    "networkx>=3.3",
+    "pytest>=8",
+    # Hotové black-box optimalizátory pro simulační úlohu (CMA-ES,
+    # TPE/bayesovská optimalizace). V řešiči black-box soutěže (blackbox/solve.py) jsou
+    # zakázané, viz pravidla soutěže. Další knihovny si přidejte `uv add …`.
+    "cma>=4.0",
+    "optuna>=4.0",
+    # Modul black-box soutěže (wheel z vydání v OMM-public, viz níže).
+    "omm-blackbox",
+]
+
+[tool.uv]
+package = false
+# Systémy, pro které existuje wheel black-box soutěže (bez tohoto omezení
+# by uv zkoušel i jiné systémy a hledal omm-blackbox na PyPI).
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
+
+# Modul s funkcemi black-box soutěže: pro každý systém vlastní wheel.
+[tool.uv.sources]
+omm-blackbox = [
+    { url = "https://github.com/tomasvicar/OMM-public/releases/download/blackbox-v0.1.0/omm_blackbox-0.1.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+    { url = "https://github.com/tomasvicar/OMM-public/releases/download/blackbox-v0.1.0/omm_blackbox-0.1.0-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
+    { url = "https://github.com/tomasvicar/OMM-public/releases/download/blackbox-v0.1.0/omm_blackbox-0.1.0-cp39-abi3-win_amd64.whl", marker = "sys_platform == 'win32' and platform_machine == 'AMD64'" },
+    { url = "https://github.com/tomasvicar/OMM-public/releases/download/blackbox-v0.1.0/omm_blackbox-0.1.0-cp39-abi3-macosx_11_0_arm64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'arm64'" },
+    { url = "https://github.com/tomasvicar/OMM-public/releases/download/blackbox-v0.1.0/omm_blackbox-0.1.0-cp39-abi3-macosx_10_12_x86_64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'x86_64'" },
+]
+
+[tool.pytest.ini_options]
+testpaths = ["model-uloha", "simulacni-uloha", "blackbox"]
