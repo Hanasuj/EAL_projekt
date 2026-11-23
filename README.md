@@ -10,8 +10,8 @@
 
 | Složka | Obsah |
 |---|---|
-| `model-uloha/` | modelová úloha (M, přesný model LP/QP/MILP a řešič): *doplňte ID a název* |
-| `simulacni-uloha/` | simulační úloha (S, black box se simulátorem): *doplňte ID a název* |
+| `model-uloha/` | modelová úloha (M, přesný model LP/QP/MILP a řešič): *M03 – Zaostřete snímek jader: záporné fotony neexistují* |
+| `simulacni-uloha/` | simulační úloha (S, black box se simulátorem): *S06 – Enzym na pěti destičkách* |
 | `blackbox/` | řešič společné black-box soutěže (`blackbox/solve.py`) |
 
 ```
