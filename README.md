@@ -2,9 +2,9 @@
 
 | Člen | Login |
 |---|---|
-| *jméno* | *xlogin00* |
-| *jméno* | *xlogin00* |
-| *jméno* | *xlogin00* |
+| *Hana Sujová* | *247305* |
+| *Karolína Holotová* | *247242* |
+
 
 ## Struktura
 
