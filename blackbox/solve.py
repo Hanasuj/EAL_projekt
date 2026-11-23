@@ -1,60 +1,71 @@
-"""Řešič black-box soutěže – sem patří vaše strategie.
+"""Riešič black-box súťaže (EAL/OMM).
 
-Vyhodnocení vyučujícího zavolá ``solve(f, rng_seed)`` pro každou funkci
-(f2, f20, f2000), několik tajných instancí a několik seedů algoritmu.
-Vyhodnocuje se jen tento soubor; funkce ``solve`` v něm musí zůstat se
-stejnou signaturou. Pomocné moduly ze složky ``blackbox/`` importovat smíte.
+Vyhodnotenie vyučujúceho volá ``solve(f, rng_seed)`` pre každú funkciu
+(f2, f20, f2000), niekoľko tajných inštancií a niekoľko seedov algoritmu.
 
-Co o funkci ``f`` víte (objekt ``omm_blackbox.Problem``):
+Stratégie (podrobne v docs/navrh_strategii.md a docs/teoria.md):
 
-    f.name                  "f2", "f20" nebo "f2000"
-    f.dim                   rozměr (2, 20, 2000)
-    f.lower, f.upper        meze (numpy pole délky dim)
-    f.budget                celkový rozpočet vyhodnocení (300 / 4 000 / 20 000)
-    f.evaluations           kolik vyhodnocení už je spotřebováno
-    f(x)                    hodnota v jednom bodě (1 vyhodnocení)
-    f.batch(X)              hodnoty v řádcích matice X (n vyhodnocení)
-    f.best_x, f.best_y      nejlepší dosud vyhodnocený bod a jeho hodnota
+* ``f2``    – latinská hyperkocka (prieskum) + Nelderova–Meadova metóda
+              z niekoľkých navzájom vzdialených štartov (strategie.strategia_f2);
+* ``f20``   – kvázi-Newtonova metóda BFGS s gradientom z konečných
+              diferencií a multištartom (strategie.strategia_f20);
+* ``f2000`` – skríning citlivosti premenných, diagonálny Newtonov krok na
+              slabých premenných a BFGS v podpriestore dôležitých premenných
+              (strategie.strategia_f2000).
 
-Pravidla (úplné znění je v pravidlech soutěže na webu projektu):
-- Každé f(x) i každý řádek f.batch(X) stojí jedno vyhodnocení. Po vyčerpání
-  rozpočtu přijde výjimka omm_blackbox.BudgetExhausted; velikost dávky proto
-  řiďte podle f.budget - f.evaluations.
-- Bod mimo meze, NaN nebo špatný tvar vyhodí ValueError a nepočítá se.
-  Body vždy ořízněte do mezí (np.clip).
-- Hodnotí se nejlepší SKUTEČNĚ VYHODNOCENÝ bod, ne vrácená hodnota.
-  Vracejte f.best_x.
-- Pořadí určuje, jak blízko optimu se v rozpočtu dostanete. Když jste
-  stejně dobří jako jiný tým, vyhrává rychlejší (menším počtem evaluací
-  na dosažení té hodnoty).
-- Veškerá náhodnost musí jít z ``rng_seed``, aby šel běh zopakovat.
-- Logiku optimalizace pište sami: hotové optimalizační algoritmy
-  (scipy.optimize, cma, optuna, nevergrad, pyswarms…) nejsou povolené.
-- Importovat smíte jen numpy, standardní knihovnu Pythonu, omm_blackbox
-  a vlastní moduly ze složky blackbox/. Nic jiného ve vyhodnocovacím
-  prostředí není (ani scipy či matplotlib, i když je máte v projektu);
-  hlídá to test blackbox/testy/test_importy.py.
-
-Tento soubor obsahuje ukázkové náhodné hledání. Je to jedna ze dvou
-referenčních baseline, kterou je potřeba porazit – nahraďte ho vlastní
-strategií (klidně jinou pro každou funkci podle f.name nebo f.dim).
+Technické pravidlá rieši spoločný ``spolocne.Vyhodnocovac`` (orezanie do
+hraníc, neprekročenie rozpočtu). Všetka náhodnosť ide z ``rng_seed``;
+o priebehu sa rozhoduje iba podľa počtu vyhodnotení, nikdy podľa času.
+Importujú sa len numpy, štandardná knižnica, omm_blackbox a vlastné moduly
+z tejto zložky.
 """
 
 import numpy as np
 
+import metody
+import strategie
+from spolocne import Vyhodnocovac
+
+# Pri vývoji True: chyba v stratégii sa neskryje. Pri odovzdaní False:
+# poistka zabráni pádu (pád = neplatný beh = posledné miesto v behu).
+LADENIE = False
+
+STRATEGIE = {
+    "f2": strategie.strategia_f2,
+    "f20": strategie.strategia_f20,
+    "f2000": strategie.strategia_f2000,
+}
+
+
+def _vyber_strategiu(f):
+    if f.name in STRATEGIE:
+        return STRATEGIE[f.name]
+    # neznámy názov: rozhodnúť podľa rozmeru
+    d = int(f.dim)
+    return strategie.strategia_f2 if d <= 5 else strategie.strategia_f20 if d <= 200 \
+        else strategie.strategia_f2000
+
 
 def solve(f, rng_seed: int) -> np.ndarray:
-    rng = np.random.default_rng(rng_seed)
-    lower = np.asarray(f.lower, dtype=float)
-    upper = np.asarray(f.upper, dtype=float)
-
-    davka = 100  # po dávkách je to mnohem rychlejší než po jednom bodu
-    while True:
-        zbyva = f.budget - f.evaluations
-        if zbyva <= 0:
-            break
-        n = min(davka, zbyva)  # dávka se musí vejít do zbytku rozpočtu
-        X = rng.uniform(lower, upper, size=(n, f.dim))
-        f.batch(X)  # nejlepší bod si pamatuje sám objekt f
-
+    try:
+        rng = np.random.default_rng(rng_seed)
+    except (TypeError, ValueError):      # napr. záporné číslo – deterministická náhrada
+        rng = np.random.default_rng(abs(int(rng_seed)))
+    ev = Vyhodnocovac(f)
+    try:
+        _vyber_strategiu(f)(ev, rng)
+        # ak stratégia skončila skôr, zvyšok rozpočtu použijeme lokálne okolo najlepšieho bodu
+        if ev.zostava() > 0 and ev.best_x is not None:
+            metody.es_1plus1(ev, rng, x0=ev.best_x, sigma0=0.01 * float(np.mean(ev.sirka)))
+        if ev.zostava() > 0:
+            metody.nahodne_hladanie(ev, rng)
+    except Exception:
+        if LADENIE:
+            raise
+    if f.best_x is None:          # posledná poistka: aspoň jeden vyhodnotený bod
+        try:
+            ev.hodnot1(ev.stred)
+        except Exception:
+            if LADENIE:
+                raise
     return np.asarray(f.best_x)
